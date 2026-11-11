@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/song_lyric.dart';
 import '../providers/lyrics_provider.dart';
 import '../services/lyrics_formatter.dart';
+import '../services/lyrics_search.dart';
 
 /// Add (when [existing] is null) or edit a lyric.
 class EditorScreen extends StatefulWidget {
@@ -82,10 +82,7 @@ class _EditorScreenState extends State<EditorScreen> {
           const SnackBar(content: Text('Isi judul lagu dulu.')));
       return;
     }
-    final artist = _artist.text.trim();
-    final q = [title, if (artist.isNotEmpty) artist, 'lyrics'].join(' ');
-    final uri = Uri.https('www.google.com', '/search', {'q': q});
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final ok = await searchLyricsOnWeb(title, _artist.text);
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Gagal membuka browser.')));

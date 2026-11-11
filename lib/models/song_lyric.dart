@@ -45,6 +45,11 @@ class SongLyric {
 
   bool get hasKnownArtist => artist != unknownArtist;
 
+  /// Marker used by template imports for songs whose lyrics aren't filled yet.
+  static const placeholder = '(Tempel lirik di sini)';
+
+  bool get needsLyrics => lyrics.contains(placeholder);
+
   /// First non-empty line of the lyrics, used as a list preview.
   String get preview {
     for (final line in lyrics.split('\n')) {

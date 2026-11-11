@@ -69,6 +69,27 @@ class LyricsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Deletes several lyrics and returns them (so the caller can offer undo).
+  Future<List<SongLyric>> deleteMany(Iterable<String> ids) async {
+    final idSet = ids.toSet();
+    final removed = _items.where((l) => idSet.contains(l.id)).toList();
+    if (removed.isEmpty) return removed;
+    await _db.deleteLyrics(idSet);
+    _items.removeWhere((l) => idSet.contains(l.id));
+    notifyListeners();
+    return removed;
+  }
+
+  /// Puts previously deleted lyrics back exactly as they were (undo).
+  Future<void> restore(List<SongLyric> lyrics) async {
+    if (lyrics.isEmpty) return;
+    await _db.putLyrics(lyrics);
+    final existing = _items.map((l) => l.id).toSet();
+    _items.addAll(lyrics.where((l) => !existing.contains(l.id)));
+    _sort();
+    notifyListeners();
+  }
+
   /// Inserts imported lyrics without ever overwriting existing records:
   /// - same id + same content  -> counted as duplicate, ignored
   /// - same id + different one -> stored as a new record with a fresh id

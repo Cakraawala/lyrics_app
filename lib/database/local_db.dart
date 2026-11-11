@@ -38,6 +38,8 @@ class LocalDb {
 
   Future<void> deleteLyric(String id) => _lyrics.delete(id);
 
+  Future<void> deleteLyrics(Iterable<String> ids) => _lyrics.deleteAll(ids);
+
   bool containsLyric(String id) => _lyrics.containsKey(id);
 
   // ---- Settings ----

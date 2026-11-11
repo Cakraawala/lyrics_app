@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../models/song_lyric.dart';
 import '../providers/lyrics_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/lyrics_formatter.dart';
+import '../services/lyrics_search.dart';
 import '../theme/app_theme.dart';
 import 'editor_screen.dart';
 
@@ -89,6 +91,45 @@ class _ReaderScreenState extends State<ReaderScreen>
         .showSnackBar(const SnackBar(content: Text('Lyrics copied.')));
   }
 
+  Future<void> _searchWeb(SongLyric lyric) async {
+    final ok = await searchLyricsOnWeb(
+      lyric.title,
+      lyric.hasKnownArtist ? lyric.artist : null,
+    );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Gagal membuka browser.')));
+    }
+  }
+
+  /// Replaces the placeholder with the clipboard text and saves immediately.
+  Future<void> _pasteAndSave(SongLyric lyric) async {
+    final provider = context.read<LyricsProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final pasted = LyricsFormatter.clean(data?.text ?? '');
+    if (pasted.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Clipboard kosong. Copy liriknya dulu dari browser.'),
+        ),
+      );
+      return;
+    }
+    final previous = lyric;
+    await provider.update(lyric.copyWith(lyrics: pasted));
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('Lirik disimpan.'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => provider.update(previous.copyWith()),
+        ),
+      ),
+    );
+  }
+
   Future<void> _delete() async {
     final provider = context.read<LyricsProvider>();
     final lyric = provider.byId(widget.lyricId);
@@ -100,12 +141,14 @@ class _ReaderScreenState extends State<ReaderScreen>
         content: Text('"${lyric.title}" will be permanently removed.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(ctx).colorScheme.error,
-                foregroundColor: Theme.of(ctx).colorScheme.onError),
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -123,7 +166,8 @@ class _ReaderScreenState extends State<ReaderScreen>
   @override
   Widget build(BuildContext context) {
     final lyric = context.select<LyricsProvider, SongLyric?>(
-        (p) => p.byId(widget.lyricId));
+      (p) => p.byId(widget.lyricId),
+    );
     final settings = context.watch<SettingsProvider>();
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
@@ -133,8 +177,9 @@ class _ReaderScreenState extends State<ReaderScreen>
     }
 
     final align = settings.centered ? TextAlign.center : TextAlign.left;
-    final cross =
-        settings.centered ? CrossAxisAlignment.center : CrossAxisAlignment.start;
+    final cross = settings.centered
+        ? CrossAxisAlignment.center
+        : CrossAxisAlignment.start;
 
     return Scaffold(
       appBar: _chromeVisible
@@ -153,7 +198,8 @@ class _ReaderScreenState extends State<ReaderScreen>
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => EditorScreen(existing: lyric)),
+                        builder: (_) => EditorScreen(existing: lyric),
+                      ),
                     );
                   },
                 ),
@@ -184,20 +230,34 @@ class _ReaderScreenState extends State<ReaderScreen>
                     crossAxisAlignment: cross,
                     children: [
                       const SizedBox(width: double.infinity),
-                      Text(lyric.title,
-                          textAlign: align,
-                          style: text.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Text(lyric.artist,
-                          textAlign: align,
-                          style: text.titleSmall?.copyWith(color: scheme.primary)),
-                      const SizedBox(height: 28),
-                      SelectableText(
-                        lyric.lyrics,
+                      Text(
+                        lyric.title,
                         textAlign: align,
-                        style: AppTheme.readerStyle(context, settings.fontSize),
+                        style: text.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        lyric.artist,
+                        textAlign: align,
+                        style: text.titleSmall?.copyWith(color: scheme.primary),
+                      ),
+                      const SizedBox(height: 28),
+                      if (lyric.needsLyrics)
+                        _MissingLyricsCard(
+                          onSearch: () => _searchWeb(lyric),
+                          onPaste: () => _pasteAndSave(lyric),
+                        )
+                      else
+                        SelectableText(
+                          lyric.lyrics,
+                          textAlign: align,
+                          style: AppTheme.readerStyle(
+                            context,
+                            settings.fontSize,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -208,7 +268,9 @@ class _ReaderScreenState extends State<ReaderScreen>
       ),
       bottomNavigationBar: AnimatedSize(
         duration: const Duration(milliseconds: 180),
-        child: _chromeVisible ? _controls(settings, scheme) : const SizedBox.shrink(),
+        child: _chromeVisible
+            ? _controls(settings, scheme)
+            : const SizedBox.shrink(),
       ),
     );
   }
@@ -227,7 +289,11 @@ class _ReaderScreenState extends State<ReaderScreen>
                 padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
                 child: Row(
                   children: [
-                    Icon(Icons.speed_rounded, size: 20, color: scheme.onSurfaceVariant),
+                    Icon(
+                      Icons.speed_rounded,
+                      size: 20,
+                      color: scheme.onSurfaceVariant,
+                    ),
                     Expanded(
                       child: Slider(
                         value: s.scrollSpeed,
@@ -240,9 +306,11 @@ class _ReaderScreenState extends State<ReaderScreen>
                     ),
                     SizedBox(
                       width: 48,
-                      child: Text('${s.scrollSpeed.round()}',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(color: scheme.onSurfaceVariant)),
+                      child: Text(
+                        '${s.scrollSpeed.round()}',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
                     ),
                   ],
                 ),
@@ -259,8 +327,10 @@ class _ReaderScreenState extends State<ReaderScreen>
                         ? () => s.setFontSize(s.fontSize - 2)
                         : null,
                   ),
-                  Text('${s.fontSize.round()}',
-                      style: TextStyle(color: scheme.onSurfaceVariant)),
+                  Text(
+                    '${s.fontSize.round()}',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
                   IconButton(
                     tooltip: 'Larger text',
                     icon: const Icon(Icons.text_increase_rounded),
@@ -270,9 +340,11 @@ class _ReaderScreenState extends State<ReaderScreen>
                   ),
                   IconButton(
                     tooltip: s.centered ? 'Align left' : 'Align center',
-                    icon: Icon(s.centered
-                        ? Icons.format_align_center_rounded
-                        : Icons.format_align_left_rounded),
+                    icon: Icon(
+                      s.centered
+                          ? Icons.format_align_center_rounded
+                          : Icons.format_align_left_rounded,
+                    ),
                     onPressed: s.toggleCentered,
                   ),
                   IconButton(
@@ -282,8 +354,12 @@ class _ReaderScreenState extends State<ReaderScreen>
                     onPressed: () => setState(() => _showSpeed = !_showSpeed),
                   ),
                   IconButton.filled(
-                    tooltip: _playing ? 'Pause auto-scroll' : 'Start auto-scroll',
-                    icon: Icon(_playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                    tooltip: _playing
+                        ? 'Pause auto-scroll'
+                        : 'Start auto-scroll',
+                    icon: Icon(
+                      _playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    ),
                     onPressed: () => _setPlaying(!_playing),
                   ),
                 ],
@@ -291,6 +367,59 @@ class _ReaderScreenState extends State<ReaderScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Shown instead of the lyric body when a template song has no lyrics yet.
+class _MissingLyricsCard extends StatelessWidget {
+  const _MissingLyricsCard({required this.onSearch, required this.onPaste});
+
+  final VoidCallback onSearch;
+  final VoidCallback onPaste;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Lirik belum diisi',
+            style: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '1. Tap "Cari lirik" untuk membuka Google.\n'
+            '2. Copy liriknya di browser.\n'
+            '3. Balik ke sini, tap "Tempel & simpan".',
+            style: text.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: onSearch,
+            icon: const Icon(Icons.travel_explore_rounded),
+            label: const Text('Cari lirik'),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: onPaste,
+            icon: const Icon(Icons.content_paste_rounded),
+            label: const Text('Tempel & simpan'),
+          ),
+        ],
       ),
     );
   }
