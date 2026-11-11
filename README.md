@@ -4,6 +4,18 @@ A minimalist, 100% offline notebook for your own song lyrics. Write or paste lyr
 
 No account, no cloud: everything stays on the device.
 
+## Purpose & disclaimer
+
+LyricsMe is a **learning project and a personal tool**. It was built to practise Flutter (local storage, state management, file import/export) and to help its owner memorise songs they love.
+
+- **The app ships with no lyrics.** It is an empty notebook. Every lyric in it is typed or pasted by the user, on their own device, for their own personal use.
+- **"Cari lirik" only opens a Google search** in the browser. The app does not scrape, download or redistribute lyrics from any site.
+- **Song lyrics are copyrighted** by their songwriters and publishers. Keep what you save in the app private. Do not commit lyric backups (`/songs/`, exported `.json` / `.zip`) to a public repository or share them publicly.
+- The `songs/` folder is git-ignored for this reason. Use it only for local files you import into the app.
+- Not affiliated with, or endorsed by, any artist, label or lyrics provider.
+
+*Bahasa Indonesia:* Aplikasi ini dibuat untuk **belajar Flutter dan sebagai alat pribadi** buat menghafal lirik lagu. Aplikasinya tidak berisi lirik apa pun. Lirik ditambahkan sendiri oleh pengguna untuk dipakai pribadi. Lirik lagu dilindungi hak cipta, jadi jangan unggah backup lirik ke repo publik.
+
 ## Features
 
 - **Home**: list of songs (title, artist, 1-line preview), real-time search across title, artist and lyrics, empty states, and a FAB to add a song.

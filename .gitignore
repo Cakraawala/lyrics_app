@@ -50,3 +50,9 @@ app.*.map.json
 # Internal project memory
 /brain
 
+# Personal lyric data (copyrighted, keep private)
+/songs/
+*.lyricsme.json
+lyricsme_backup_*.json
+lyricsme_lyrics_*.zip
+
