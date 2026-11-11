@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/song_lyric.dart';
 import '../providers/lyrics_provider.dart';
@@ -65,6 +67,45 @@ class _EditorScreenState extends State<EditorScreen> {
     setState(() => _lyrics.text = cleaned);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: const Text('Lyrics tidied up.'),
+      action: SnackBarAction(
+        label: 'Undo',
+        onPressed: () => setState(() => _lyrics.text = previous),
+      ),
+    ));
+  }
+
+  /// Opens a web search for this song's lyrics in the browser.
+  Future<void> _searchWeb() async {
+    final title = _title.text.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Isi judul lagu dulu.')));
+      return;
+    }
+    final artist = _artist.text.trim();
+    final q = [title, if (artist.isNotEmpty) artist, 'lyrics'].join(' ');
+    final uri = Uri.https('www.google.com', '/search', {'q': q});
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membuka browser.')));
+    }
+  }
+
+  /// Replaces the lyrics field (or placeholder) with the clipboard, cleaned.
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final pasted = data?.text?.trim() ?? '';
+    if (!mounted) return;
+    if (pasted.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Clipboard kosong.')));
+      return;
+    }
+    final previous = _lyrics.text;
+    setState(() => _lyrics.text = LyricsFormatter.clean(pasted));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Lirik ditempel & dirapikan.'),
       action: SnackBarAction(
         label: 'Undo',
         onPressed: () => setState(() => _lyrics.text = previous),
@@ -154,6 +195,26 @@ class _EditorScreenState extends State<EditorScreen> {
                 decoration: const InputDecoration(hintText: 'Artist (optional)'),
               ),
               const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _searchWeb,
+                      icon: const Icon(Icons.travel_explore_rounded, size: 18),
+                      label: const Text('Cari lirik'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: _pasteFromClipboard,
+                      icon: const Icon(Icons.content_paste_rounded, size: 18),
+                      label: const Text('Tempel'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Row(
                 children: [
                   Text('Lyrics',
